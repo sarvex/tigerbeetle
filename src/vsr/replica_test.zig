@@ -1,4 +1,5 @@
 const std = @import("std");
+const stdx = @import("../stdx.zig");
 const assert = std.debug.assert;
 const log = std.log.scoped(.test_replica);
 const expectEqual = std.testing.expectEqual;
@@ -19,7 +20,7 @@ const checkpoint_1 = checkpoint_trigger_1 - constants.lsm_batch_multiple;
 const checkpoint_2 = checkpoint_trigger_2 - constants.lsm_batch_multiple;
 const checkpoint_trigger_1 = slot_count - 1;
 const checkpoint_trigger_2 = slot_count + checkpoint_trigger_1 - constants.lsm_batch_multiple;
-const log_level = std.log.Level.err;
+const log_level = std.log.Level.info;
 
 // TODO Test client eviction once it no longer triggers a client panic.
 // TODO Detect when cluster has stabilized and stop run() early, rather than just running for a
@@ -34,6 +35,26 @@ comptime {
     // The tests are written for these configuration values in particular.
     assert(constants.journal_slot_count == 64);
     assert(constants.lsm_batch_multiple == 4);
+}
+
+test "reconfiguration-smoke" {
+    const t = try TestContext.init(.{
+        .replica_count = 3,
+        .standby_count = 3,
+    });
+    defer t.deinit();
+
+    var c = t.clients(0, t.cluster.clients.len);
+    try c.request(20, 20);
+    try expectEqual(t.replica(.R_).epoch(), 0);
+    try expectEqual(t.replica(.R_).view(), 1);
+    try expectEqual(t.replica(.R_).commit(), 20);
+    var admin = t.clients(0, 1);
+    try admin.request_reconfigure(&.{ 3, 4, 5, 0, 1, 2 });
+
+    try c.request(30, 31);
+    try expectEqual(t.replica(.R_).epoch(), 1);
+    try expectEqual(t.replica(.R_).view(), 1);
 }
 
 test "Cluster: recovery: WAL prepare corruption (R=3, corrupt right of head)" {
@@ -761,6 +782,10 @@ const TestReplicas = struct {
         return t.get(.log_view);
     }
 
+    pub fn epoch(t: *const TestReplicas) u32 {
+        return t.get(.epoch);
+    }
+
     pub fn op_head(t: *const TestReplicas) u64 {
         return t.get(.op);
     }
@@ -928,6 +953,39 @@ const TestClients = struct {
             }
         }
         try std.testing.expectEqual(t.replies(), expect_replies);
+    }
+
+    pub fn request_reconfigure(t: *TestClients, replicas: []const u8) !void {
+        assert(t.clients.len == 1);
+        assert(replicas.len == t.cluster.replicas.len);
+
+        var configuration = [_]u128{0} ** constants.nodes_max;
+        for (replicas) |index, i| {
+            configuration[i] = t.cluster.replicas[index].replica_id;
+        }
+
+        for (t.clients.constSlice()) |c| {
+            t.context.client_requests[c] += 1;
+            t.requests += 1;
+
+            const client = &t.cluster.clients[c];
+            const message = client.get_message();
+            defer client.unref(message);
+
+            const body_size = @sizeOf([constants.nodes_max]u128);
+            stdx.copy_disjoint(.inexact, u8, message.buffer[@sizeOf(vsr.Header)..], std.mem.asBytes(&configuration));
+            t.cluster.request(c, .reconfigure, message, body_size);
+        }
+
+        const tick_max = 2_000;
+        var tick: usize = 0;
+        while (tick < tick_max) : (tick += 1) {
+            if (t.context.tick()) tick = 0;
+        }
+        for (t.cluster.clients) |*c| {
+            c.message_bus.perm = replicas;
+            c.epoch += 1;
+        }
     }
 
     pub fn replies(t: *const TestClients) usize {

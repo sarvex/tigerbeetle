@@ -647,8 +647,8 @@ pub fn JournalType(comptime Replica: type, comptime Storage: type) type {
                             }
                         } else if (a.checksum == b.parent) {
                             // A is connected to B, and B is connected or B is op_max.
-                            assert(a.view <= b.view);
-                        } else if (a.view != b.view) {
+                            assert(a.epoch < b.epoch or a.epoch == b.epoch and a.view <= b.view);
+                        } else if (a.epoch != b.epoch or a.view != b.view) {
                             // A is not connected to B, open range:
                             assert(b.op <= op_max);
                             range = .{ .op_min = a.op, .op_max = a.op };

@@ -94,6 +94,13 @@ pub fn ClusterType(comptime StateMachineType: fn (comptime Storage: type, compti
 
         context: ?*anyopaque = null,
 
+        pub fn dump(cluster: *const Self) void {
+            for (cluster.replicas) |replica| {
+                replica.dump();
+            }
+            std.debug.print("\n", .{});
+        }
+
         pub fn init(
             allocator: mem.Allocator,
             /// Includes command=register messages.
@@ -542,13 +549,14 @@ pub fn ClusterType(comptime StateMachineType: fn (comptime Storage: type, compti
                 }
 
                 info = std.fmt.bufPrint(&info_buffer, "" ++
-                    "{[view]:>4}V " ++
+                    "{[view]:>4}/{[epoch]:_>2}V " ++
                     "{[commit_min]:>3}/{[commit_max]:_>3}C " ++
                     "{[journal_op_min]:>3}:{[journal_op_max]:_>3}Jo " ++
                     "{[journal_faulty]:>2}/{[journal_dirty]:_>2}J! " ++
                     "{[wal_op_min]:>3}:{[wal_op_max]:>3}Wo " ++
                     "{[grid_blocks_free]:>7}Gf", .{
                     .view = replica.view,
+                    .epoch = replica.epoch,
                     .commit_min = replica.commit_min,
                     .commit_max = replica.commit_max,
                     .journal_op_min = journal_op_min,

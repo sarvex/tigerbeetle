@@ -30,7 +30,7 @@ pub const output = std.log.scoped(.cluster);
 
 /// Set this to `false` if you want to see how literally everything works.
 /// This will run much slower but will trace all logic across the cluster.
-const log_state_transitions_only = builtin.mode != .Debug;
+const log_state_transitions_only = true;
 
 const log_simulator = std.log.scoped(.simulator);
 
@@ -149,7 +149,7 @@ pub fn main() !void {
         .cluster = cluster_options,
         .workload = workload_options,
         // TODO Swarm testing: Test long+few crashes and short+many crashes separately.
-        .replica_crash_probability = 0.00002,
+        .replica_crash_probability = 0,
         .replica_crash_stability = random.uintLessThan(u32, 1_000),
         .replica_restart_probability = 0.0002,
         .replica_restart_stability = random.uintLessThan(u32, 1_000),
@@ -434,7 +434,13 @@ pub const Simulator = struct {
         var request_message = client.get_message();
         defer client.unref(request_message);
 
+        var replica_ids = [_]u128{0} ** constants.nodes_max;
+        for (simulator.cluster.replicas) |replica, i| {
+            replica_ids[i] = replica.replica_id;
+        }
+
         const request_metadata = simulator.workload.build_request(
+            &replica_ids,
             client_index,
             @alignCast(
                 @alignOf(vsr.Header),

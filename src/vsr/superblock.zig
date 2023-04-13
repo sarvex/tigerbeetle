@@ -136,13 +136,16 @@ pub const SuperBlockHeader = extern struct {
         /// The last view in which the replica's status was normal.
         log_view: u32,
 
-        /// The view number of the replica.
+        /// The epoch number of the replica, monotonic.
+        epoch: u32,
+
+        /// The view number of the replica, monotonic withing a single epoch.
         view: u32,
 
         /// Number of replicas (determines sizes of the quorums), part of VSR configuration.
         replica_count: u8,
 
-        reserved: [7]u8 = [_]u8{0} ** 7,
+        reserved: [3]u8 = [_]u8{0} ** 3,
 
         comptime {
             assert(@sizeOf(VSRState) == 256);
@@ -165,6 +168,7 @@ pub const SuperBlockHeader = extern struct {
                 .commit_max = 0,
                 .log_view = 0,
                 .view = 0,
+                .epoch = 0,
             };
         }
 
@@ -186,8 +190,9 @@ pub const SuperBlockHeader = extern struct {
             assert(old.replica_count == new.replica_count);
             assert(meta.eql(old.members, new.members));
 
-            if (old.view > new.view) return false;
-            if (old.log_view > new.log_view) return false;
+            if (old.epoch > new.epoch) return false;
+            if (old.epoch == new.epoch and old.view > new.view) return false;
+            if (old.epoch == new.epoch and old.log_view > new.log_view) return false;
             if (old.commit_min > new.commit_min) return false;
             if (old.commit_max > new.commit_max) return false;
 
@@ -676,6 +681,7 @@ pub fn SuperBlockType(comptime Storage: type) type {
                     .commit_max = 0,
                     .log_view = 0,
                     .view = 0,
+                    .epoch = 0,
                     .replica_count = options.replica_count,
                 },
                 .snapshots = undefined,
@@ -756,6 +762,7 @@ pub fn SuperBlockType(comptime Storage: type) type {
 
                 .log_view = superblock.staging.vsr_state.log_view,
                 .view = superblock.staging.vsr_state.view,
+                .epoch = superblock.staging.vsr_state.epoch,
                 .replica_id = superblock.staging.vsr_state.replica_id,
                 .members = superblock.staging.vsr_state.members,
                 .replica_count = superblock.staging.vsr_state.replica_count,
@@ -776,10 +783,11 @@ pub fn SuperBlockType(comptime Storage: type) type {
             commit_max: u64,
             log_view: u32,
             view: u32,
+            epoch: u32,
             headers: *const vsr.Headers.ViewChangeArray,
         };
 
-        /// The replica calls view_change() to persist its view/log_view — it cannot
+        /// The replica calls view_change() to persist its view/log_view/epoch — it cannot
         /// advertise either value until it is certain they will never backtrack.
         ///
         /// The update must advance view/log_view (monotonically increasing).
@@ -792,10 +800,15 @@ pub fn SuperBlockType(comptime Storage: type) type {
             assert(superblock.opened);
             assert(superblock.staging.vsr_state.commit_min <= update.headers.array.get(0).op);
             assert(superblock.staging.vsr_state.commit_max <= update.commit_max);
-            assert(superblock.staging.vsr_state.view <= update.view);
-            assert(superblock.staging.vsr_state.log_view <= update.log_view);
-            assert(superblock.staging.vsr_state.log_view < update.log_view or
-                superblock.staging.vsr_state.view < update.view);
+            assert(superblock.staging.vsr_state.epoch <= update.epoch);
+            if (superblock.staging.vsr_state.epoch == update.epoch) {
+                assert(superblock.staging.vsr_state.view <= update.view);
+                assert(superblock.staging.vsr_state.log_view <= update.log_view);
+                assert(superblock.staging.vsr_state.log_view < update.log_view or
+                    superblock.staging.vsr_state.view < update.view);
+            } else {
+                assert(update.log_view == 0);
+            }
 
             update.headers.verify();
             assert(update.view >= update.log_view);
@@ -806,6 +819,7 @@ pub fn SuperBlockType(comptime Storage: type) type {
                 .commit_max = update.commit_max,
                 .log_view = update.log_view,
                 .view = update.view,
+                .epoch = update.epoch,
                 .replica_id = superblock.staging.vsr_state.replica_id,
                 .members = superblock.staging.vsr_state.members,
                 .replica_count = superblock.staging.vsr_state.replica_count,

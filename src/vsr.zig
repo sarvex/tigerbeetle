@@ -110,6 +110,8 @@ pub const Command = enum(u8) {
     do_view_change,
     start_view,
 
+    end_epoch,
+
     request_start_view,
     request_headers,
     request_prepare,
@@ -131,6 +133,8 @@ pub const Operation = enum(u8) {
     root = 1,
     /// The value 2 is reserved to register a client session with the cluster.
     register = 2,
+    /// The value 3 is reserved for reconfiguration request.
+    reconfigure = 3,
 
     /// Operations <vsr_operations_reserved are reserved for the control plane.
     /// Operations ≥vsr_operations_reserved are available for the state machine.
@@ -332,7 +336,6 @@ pub const Header = extern struct {
     pub fn invalid(self: *const Header) ?[]const u8 {
         if (self.version != Version) return "version != Version";
         if (self.size < @sizeOf(Header)) return "size < @sizeOf(Header)";
-        if (self.epoch != 0) return "epoch != 0";
         return switch (self.command) {
             .reserved => self.invalid_reserved(),
             .ping => self.invalid_ping(),
@@ -347,6 +350,7 @@ pub const Header = extern struct {
             .start_view_change => self.invalid_start_view_change(),
             .do_view_change => self.invalid_do_view_change(),
             .start_view => self.invalid_start_view(),
+            .end_epoch => null, // FIXME
             .request_start_view => self.invalid_request_start_view(),
             .request_headers => self.invalid_request_headers(),
             .request_prepare => self.invalid_request_prepare(),
@@ -363,6 +367,7 @@ pub const Header = extern struct {
         if (self.client != 0) return "client != 0";
         if (self.context != 0) return "context != 0";
         if (self.request != 0) return "request != 0";
+        if (self.epoch != 0) return "epoch != 0";
         if (self.view != 0) return "view != 0";
         if (self.commit != 0) return "commit != 0";
         if (self.timestamp != 0) return "timestamp != 0";
@@ -407,6 +412,7 @@ pub const Header = extern struct {
         if (self.client == 0) return "client == 0";
         if (self.context != 0) return "context != 0";
         if (self.request != 0) return "request != 0";
+        if (self.epoch != 0) return "epoch != 0";
         if (self.view != 0) return "view != 0";
         if (self.op != 0) return "op != 0";
         if (self.commit != 0) return "commit != 0";
@@ -453,13 +459,16 @@ pub const Header = extern struct {
                 if (self.size != @sizeOf(Header)) return "size != @sizeOf(Header)";
             },
             else => {
-                if (@enumToInt(self.operation) < constants.vsr_operations_reserved) {
-                    return "operation is reserved";
-                }
                 // Thereafter, the client must provide the session number in the context:
                 // These requests should set `parent` to the `checksum` of the previous reply.
                 if (self.context == 0) return "context == 0";
                 if (self.request == 0) return "request == 0";
+
+                if (self.operation != .reconfigure and
+                    @enumToInt(self.operation) < constants.vsr_operations_reserved)
+                {
+                    return "operation is reserved";
+                }
             },
         }
         return null;
@@ -474,6 +483,7 @@ pub const Header = extern struct {
                 if (self.client != 0) return "root: client != 0";
                 if (self.context != 0) return "root: context != 0";
                 if (self.request != 0) return "root: request != 0";
+                if (self.epoch != 0) return "root: epoch != 0";
                 if (self.view != 0) return "root: view != 0";
                 if (self.op != 0) return "root: op != 0";
                 if (self.commit != 0) return "root: commit != 0";
@@ -510,6 +520,7 @@ pub const Header = extern struct {
                 if (self.client != 0) return "root: client != 0";
                 if (self.context != 0) return "root: context != 0";
                 if (self.request != 0) return "root: request != 0";
+                if (self.epoch != 0) return "root: epoch != 0";
                 if (self.view != 0) return "root: view != 0";
                 if (self.op != 0) return "root: op != 0";
                 if (self.commit != 0) return "root: commit != 0";
@@ -1033,6 +1044,14 @@ pub fn checksum(source: []const u8) u128 {
     return @bitCast(u128, target[0..@sizeOf(u128)].*);
 }
 
+pub inline fn view_order_or_eql(a: anytype, b: anytype) bool {
+    return a.epoch < b.epoch or a.epoch == b.epoch and a.view <= b.view;
+}
+
+pub inline fn view_order_strict(a: anytype, b: anytype) bool {
+    return a.epoch < b.epoch or a.epoch == b.epoch and a.view < b.view;
+}
+
 pub fn quorums(replica_count: u8) struct {
     replication: u8,
     view_change: u8,
@@ -1141,6 +1160,15 @@ pub fn assert_valid_member(members: *const [constants.nodes_max]u128, replica_id
     } else unreachable;
 }
 
+pub fn view_monotonic(
+    epoch_prev: u32,
+    view_prev: u32,
+    epoch_next: u32,
+    view_next: u32,
+) bool {
+    return epoch_next > epoch_prev or epoch_next == epoch_prev and view_next >= view_prev;
+}
+
 pub const Headers = struct {
     pub const Array = std.BoundedArray(Header, constants.view_change_headers_max);
     /// The SuperBlock's persisted VSR headers.
@@ -1221,7 +1249,7 @@ const ViewChangeHeadersSlice = struct {
                     continue; // Don't update "child".
                 },
                 .valid => {
-                    assert(header.view <= child.view);
+                    assert(header.epoch < child.epoch or header.epoch == child.epoch and header.view <= child.view);
                     assert(header.timestamp < child.timestamp);
                     if (header.op + 1 == child.op) {
                         assert(header.checksum == child.parent);
