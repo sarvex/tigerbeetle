@@ -2,13 +2,13 @@
 
 - _bar_/_measure_: `lsm_batch_multiple` beats; unit of incremental compaction.
 - _beat_: `op % lsm_batch_multiple`; Single step of an incremental compaction.
-- _groove_: A collection of LSM trees, storing objects and their indices.
+- _groove_: a collection of LSM trees for an object: one tree for the object and one tree for each field on the object (so that every field on the object is indexed). If an object has two fields, the groove will produce three trees.
 - _immutable table_: in-memory table; one per tree. Used to periodically flush the mutable table to
   disk.
-- _level_: Between `0` and `lsm_levels - 1` (usually `lsm_levels = 7`).
+- _level_: a collection of immutable tables, numbering between `0` and `config.lsm_levels - 1` (usually `config.lsm_levels = 7`).
 - _forest_: a collection of grooves.
 - _manifest_: index of table and level metadata; one per tree.
-- _mutable table_: in-memory table; one per tree. All tree updates are applied only to this table.
+- _mutable table_: in-memory table; one per tree. All tree updates (i.e. `Tree.put`) directly modify just this table.
 - _snapshot_: sequence number which selects the queryable partition of on-disk tables.
 
 # Tree
