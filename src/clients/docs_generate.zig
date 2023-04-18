@@ -488,7 +488,7 @@ const Generator = struct {
 
         try write_shell_newlines_into_single_line(
             &cmd,
-            self.language.install_sample_file_build_commands,
+            self.language.run_commands,
         );
 
         // The above commands all end with ` && `
@@ -643,7 +643,7 @@ const Generator = struct {
         });
         mw.code(language.markdown_name, language.install_sample_file);
         mw.paragraph("Finally, build and run:");
-        mw.commands(language.install_sample_file_test_commands);
+        mw.commands(language.run_commands);
 
         mw.paragraph(
             \\Now that all prerequisites and dependencies are correctly set
@@ -943,16 +943,14 @@ const Generator = struct {
 
             mw.header(2, "Start the TigerBeetle server");
             mw.paragraph(
-                //Follow steps in the repo README to start a **single
-                //server** [from a single
-                //binary](/README.md#single-binary) or [in a Docker
-                //container](/README.md#with-docker).
-            );
-
-            mw.paragraph(
-                //If you are not running on port `localhost:3000`, set
-                //the environment variable `TB_ADDRESS` to the full
-                //address of the TigerBeetle server you started.
+                \\Follow steps in the repo README to start a **single
+                \\server** [from a single
+                \\binary](/README.md#single-binary) or [in a Docker
+                \\container](/README.md#with-docker).
+                \\
+                \\If you are not running on port `localhost:3000`, set
+                \\the environment variable `TB_ADDRESS` to the full
+                \\address of the TigerBeetle server you started.
             );
 
             mw.header(2, "Run this sample");

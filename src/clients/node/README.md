@@ -24,7 +24,7 @@ Then, install the TigerBeetle client:
 $ npm install tigerbeetle-node
 ```
 
-Now, create `test.js` and copy this into it:
+Now, create `main.js` and copy this into it:
 
 ```javascript
 const { createClient } = require("tigerbeetle-node");
@@ -34,7 +34,7 @@ console.log("Import ok!");
 Finally, build and run:
 
 ```console
-$ node run test.js
+$ node main.js
 ```
 
 Now that all prerequisites and dependencies are correctly set
@@ -476,7 +476,7 @@ $ ./scripts/install_zig.sh
 $ cd src/clients/node
 $ npm install --include dev
 $ npm pack
-$ [ "$TEST" = "true" ] && mvn test || echo "Skipping client unit tests"
+$ [ "$TEST" = "true" ] && npm test || echo "Skipping client unit tests"
 ```
 
 ### On Windows

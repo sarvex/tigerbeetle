@@ -30,7 +30,7 @@ $ go mod init tbtest
 $ go mod tidy
 ```
 
-Now, create `test.go` and copy this into it:
+Now, create `main.go` and copy this into it:
 
 ```go
 package main
@@ -46,7 +46,7 @@ func main() {
 Finally, build and run:
 
 ```console
-$ go run test.go
+$ go run main.go
 ```
 
 Now that all prerequisites and dependencies are correctly set
