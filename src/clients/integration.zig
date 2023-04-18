@@ -11,6 +11,9 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
+const java_docs = @import("./java/docs.zig").JavaDocs;
+const go_docs = @import("./go/docs.zig").GoDocs;
+const node_docs = @import("./node/docs.zig").NodeDocs;
 const run = @import("./docs_generate.zig").run;
 const run_with_env = @import("./docs_generate.zig").run_with_env;
 const TmpDir = @import("./docs_generate.zig").TmpDir;
@@ -118,8 +121,17 @@ fn prepare_java_sample_integration_test(
     _ = try cmds.appendSlice(&[_][]const u8{
         if (builtin.os.tag == .windows) "powershell" else "sh",
         "-c",
-        "mvn -s local-settings.xml install " ++ cmdSep ++
-            " mvn -s local-settings.xml exec:java",
+        comptime std.mem.replaceAll(
+            comptime std.mem.replaceAll(
+                u8,
+                java.install_commands ++ "\n" ++
+                    java.run_commands,
+                "mvn",
+                "mvn -s local-settings.xml",
+            ),
+            "\n",
+            cmdSep,
+        ),
     });
 }
 
@@ -176,7 +188,7 @@ fn prepare_go_sample_integration_test(
         "tidy",
     });
 
-    _ = try cmds.appendSlice(&[_][]const u8{ "go", "run", "main.go" });
+    _ = try cmds.appendSlice(go_docs.run_commands);
 }
 
 // Caller is responsible for resetting to a good cwd after this completes.
@@ -236,10 +248,7 @@ fn prepare_node_sample_integration_test(
     });
 
     // Store the way to run the main program.
-    try cmds.appendSlice(&[_][]const u8{
-        "node",
-        "main.js",
-    });
+    try cmds.appendSlice(node_docs.run_commands);
 }
 
 fn copy_into_tmp_dir(

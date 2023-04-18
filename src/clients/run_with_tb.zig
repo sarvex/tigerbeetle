@@ -137,7 +137,7 @@ pub fn run_with_tb(arena: *std.heap.ArenaAllocator, commands: []const []const u8
     );
     var env = try std.process.getEnvMap(arena.allocator());
     try env.put(
-        "TB_PORT",
+        "TB_ADDRESS",
         try std.fmt.allocPrint(arena.allocator(), "{}", .{port}),
     );
     cmdCp.env_map = &env;

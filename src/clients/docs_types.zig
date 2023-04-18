@@ -58,10 +58,11 @@ pub const Docs = struct {
     // Minimal code just to test importing the package works.
     install_sample_file: Code,
 
-    // Commands for testing that code compiles. (Not shown to the user.)
-    install_sample_file_build_commands: Code,
-    // Commands for running the shown sample file. (Shown to the user.)
-    install_sample_file_test_commands: Code,
+    // Commands for building code without running it.
+    build_commands: Code,
+    // Commands for building and running code.
+    run_commands: Code,
+
     // Additional instructions for install.
     install_documentation: Markdown,
 

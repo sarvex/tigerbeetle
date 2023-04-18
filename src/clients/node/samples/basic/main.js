@@ -4,7 +4,7 @@ const { createClient } = require("tigerbeetle-node");
 
 const client = createClient({
   cluster_id: 0,
-  replica_addresses: [process.env.TB_PORT || '3000'],
+  replica_addresses: [process.env.TB_ADDRESS || '3000'],
 });
 
 async function main() {

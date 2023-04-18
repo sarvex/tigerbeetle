@@ -260,7 +260,7 @@ const Generator = struct {
     ) !Generator {
         var test_file_name = language.test_file_name;
         if (test_file_name.len == 0) {
-            test_file_name = "test";
+            test_file_name = "main";
         }
 
         return Generator{
@@ -919,6 +919,7 @@ const Generator = struct {
                 \\
                 \\Code for this sample is in [./{s}{s}.{s}](./{s}{s}.{s}).
                 \\
+                \\
             , .{
                 sample.proper_name,
                 language.proper_name,
@@ -939,6 +940,24 @@ const Generator = struct {
                     sample.directory,
                 },
             ));
+
+            mw.header(2, "Start the TigerBeetle server");
+            mw.paragraph(
+                //Follow steps in the repo README to start a **single
+                //server** [from a single
+                //binary](/README.md#single-binary) or [in a Docker
+                //container](/README.md#with-docker).
+            );
+
+            mw.paragraph(
+                //If you are not running on port `localhost:3000`, set
+                //the environment variable `TB_ADDRESS` to the full
+                //address of the TigerBeetle server you started.
+            );
+
+            mw.header(2, "Run this sample");
+            mw.paragraph("Now you can run this sample:");
+            mw.commands(language.run_commands);
 
             mw.header(2, "Walkthrough");
             mw.paragraph("Here's what this project does.");
@@ -965,7 +984,7 @@ pub fn main() !void {
         if (std.mem.eql(u8, arg, "--language")) {
             var filter = args.nextPosix().?;
             skipLanguage = [_]bool{true} ** languages.len;
-            for (languages) |language, i| {
+            for (languages, 0..) |language, i| {
                 if (std.mem.eql(u8, filter, language.markdown_name)) {
                     skipLanguage[i] = false;
                 }
@@ -985,7 +1004,7 @@ pub fn main() !void {
         }
     }
 
-    for (languages) |language, i| {
+    for (languages, 0..) |language, i| {
         if (skipLanguage[i]) {
             continue;
         }

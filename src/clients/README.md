@@ -117,7 +117,7 @@ to it. Specifically, it:
 
 * Creates a random temporary directory and formats TigerBeetle's data file there
 * Spins up a TigerBeetle server on an open port
-* Sets the port in the `TB_PORT` environment variable
+* Sets the port in the `TB_ADDRESS` environment variable
 * Calls the commands passed on the CLI
 * Turns off the server and deletes the temporary directory
 
