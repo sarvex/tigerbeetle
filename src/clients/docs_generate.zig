@@ -984,7 +984,7 @@ pub fn main() !void {
         if (std.mem.eql(u8, arg, "--language")) {
             var filter = args.nextPosix().?;
             skipLanguage = [_]bool{true} ** languages.len;
-            for (languages, 0..) |language, i| {
+            for (languages) |language, i| {
                 if (std.mem.eql(u8, filter, language.markdown_name)) {
                     skipLanguage[i] = false;
                 }
@@ -1004,7 +1004,7 @@ pub fn main() !void {
         }
     }
 
-    for (languages, 0..) |language, i| {
+    for (languages) |language, i| {
         if (skipLanguage[i]) {
             continue;
         }
